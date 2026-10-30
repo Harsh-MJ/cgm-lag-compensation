@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.log
+.ipynb_checkpoints/
+.DS_Store
+# prototype run outputs written next to the shared data file
+data/results*.json
+data/preds*.pkl
+data/tuned*.pkl
+figs/

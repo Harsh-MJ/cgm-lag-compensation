@@ -1,0 +1,46 @@
+{
+ "excluded": [
+  "child#002",
+  "child#004",
+  "child#008"
+ ],
+ "folds": [
+  [
+   "adolescent#001",
+   "adolescent#006",
+   "adult#001",
+   "adult#006",
+   "child#001",
+   "child#009"
+  ],
+  [
+   "adolescent#002",
+   "adolescent#007",
+   "adult#002",
+   "adult#007",
+   "child#003",
+   "child#010"
+  ],
+  [
+   "adolescent#003",
+   "adolescent#008",
+   "adult#003",
+   "adult#008",
+   "child#005"
+  ],
+  [
+   "adolescent#004",
+   "adolescent#009",
+   "adult#004",
+   "adult#009",
+   "child#006"
+  ],
+  [
+   "adolescent#005",
+   "adolescent#010",
+   "adult#005",
+   "adult#010",
+   "child#007"
+  ]
+ ]
+}

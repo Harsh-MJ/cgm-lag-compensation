@@ -1,0 +1,79 @@
+{
+ "excluded": [
+  "child#002",
+  "child#004",
+  "child#008"
+ ],
+ "n": 27,
+ "noise_sd": 5.0,
+ "dt": 5,
+ "miss_frac": 0.05,
+ "results": {
+  "S0_matched": {
+   "n": 27,
+   "rmse_med": 8.673348539308167,
+   "mard_med": 4.945299092284841,
+   "bias_med": 0.07620879058861312,
+   "lag_med": 10.0,
+   "tau_mean": 11.894404569310982,
+   "nominal_med": 11.19820828667413,
+   "lag_minus_nominal_med": -0.7296137339055786,
+   "compress_pct": 0.0
+  },
+  "S1_sensor_chain": {
+   "n": 27,
+   "rmse_med": 11.161844630105495,
+   "mard_med": 5.504149547275831,
+   "bias_med": 0.07855164473732074,
+   "lag_med": 15.0,
+   "tau_mean": 11.894404569310982,
+   "nominal_med": 16.19820828667413,
+   "lag_minus_nominal_med": -0.7296137339055786,
+   "compress_pct": 0.0
+  },
+  "S2_second_order": {
+   "n": 27,
+   "rmse_med": 8.929421141068522,
+   "mard_med": 4.99758017816101,
+   "bias_med": 0.0748061741923613,
+   "lag_med": 11.0,
+   "tau_mean": 11.894404569310982,
+   "nominal_med": 11.19820828667413,
+   "lag_minus_nominal_med": -0.5473441108545032,
+   "compress_pct": 0.0
+  },
+  "S3_tau_varying": {
+   "n": 27,
+   "rmse_med": 8.80616210763374,
+   "mard_med": 4.676749986893272,
+   "bias_med": 0.09694322618255045,
+   "lag_med": 10.0,
+   "tau_mean": 11.894404569310982,
+   "nominal_med": 11.19820828667413,
+   "lag_minus_nominal_med": -1.1358574610244982,
+   "compress_pct": 0.0
+  },
+  "S4_calib_artifact": {
+   "n": 27,
+   "rmse_med": 11.19320534616934,
+   "mard_med": 6.990294461803119,
+   "bias_med": -0.0419288764063234,
+   "lag_med": 10.0,
+   "tau_mean": 11.894404569310982,
+   "nominal_med": 11.19820828667413,
+   "lag_minus_nominal_med": -0.6567164179104488,
+   "compress_pct": 0.6117701482809158
+  },
+  "S5_full": {
+   "n": 27,
+   "rmse_med": 14.063519610159553,
+   "mard_med": 7.248810838326227,
+   "bias_med": -0.3156908698680479,
+   "lag_med": 15.0,
+   "tau_mean": 11.894404569310982,
+   "nominal_med": 16.19820828667413,
+   "lag_minus_nominal_med": -0.8865979381443303,
+   "compress_pct": 0.8154113804002617
+  }
+ }
+}
