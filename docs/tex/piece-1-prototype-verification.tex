@@ -1,0 +1,138 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,graphicx,hyperref,longtable,booktabs,array}
+\usepackage[margin=2.2cm]{geometry}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setlength{\parindent}{0pt}\setlength{\parskip}{6pt}
+
+\begin{document}
+\hypertarget{piece-1-verification-of-the-chat-1-prototype-30-oct-2026}{%
+\section{Piece 1: verification of the chat-1 prototype (30 Oct
+2026)}\label{piece-1-verification-of-the-chat-1-prototype-30-oct-2026}}
+
+Scope: check the inherited simglucose + EKF prototype
+(\texttt{prototype/}) before building on it. The prototype was written
+by Claude (AI assistant) in an earlier chat; nobody on the team has yet
+run or reviewed it, so it must not be presented as team work until Piece
+3-4 re-implement or sign off each part.
+
+\hypertarget{checked-and-confirmed}{%
+\subsection{Checked and confirmed}\label{checked-and-confirmed}}
+
+\begin{itemize}
+\tightlist
+\item
+  Raw-CGM RMSE vs true plasma recomputed directly from \texttt{sim.npz}
+  on the 13 held-out patients: 8.71 (NS=0), 9.46 (NS=0.3), 15.08 (NS=1).
+  Matches the handoff.
+\item
+  Every row of the handoff results table, hypoglycaemia delays and
+  tau-recovery figures matches the saved results JSON files
+  (tau-recovery correlation is 0.0 to 0.36, not "about 0.1 to 0.2").
+\item
+  Patient exclusions (child\#002, \#004, \#008), 14 tune / 13 test split
+  and tau range (6.6 to 19.9 min, mean 11.9, sd 3.2) reproduce.
+\item
+  simglucose 0.2.11 source: subcutaneous state obeys dx12/dt =
+  -ksc\emph{x12 + ksc}x3, so the simulator lag is exactly first-order
+  with tau = 1/ksc.
+\item
+  CGM samples update at minute indices = 2 (mod 3), which matches the
+  \texttt{arange(2,\ N,\ 3)} sampling in \texttt{evaluate.py}; no
+  staleness offset.
+\end{itemize}
+
+\hypertarget{resolved-open-item}{%
+\subsection{Resolved open item}\label{resolved-open-item}}
+
+\begin{itemize}
+\tightlist
+\item
+  Handoff said the 0.98 lag-1 autocorrelation of sensor noise was "not
+  verified". Verified: simglucose \texttt{noise\_gen.py} draws
+  Johnson-transformed noise every 15 min (PACF 0.7) and
+  cubic-interpolates it to the sample time. Measured noise
+  autocorrelation: 0.98 at 3 min, 0.72 at 15 min, 0.47 at 30 min, 0.24
+  at 60 min. So the simulator noise is slow and drift-like with no fast
+  component; "noise dominates at NS=1" is partly a property of this
+  noise model, not of real CGM.
+\end{itemize}
+
+\hypertarget{issues-to-fix-carried-into-later-pieces}{%
+\subsection{Issues to fix (carried into later
+pieces)}\label{issues-to-fix-carried-into-later-pieces}}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Noise model has no fast component and is unrealistic for real sensors
+  (Piece 2).
+\item
+  Several tuned process-noise values sit at the grid edge (qr = 0.3 at
+  NS=0 for every EKF variant); widen the grid (Piece 3).
+\item
+  Noise sd and phi are estimated from (cgm - true subcutaneous glucose),
+  which needs ground truth; fine in simulation, not available on real
+  data.
+\item
+  At NS=0 online-tau EKF (RMSE 5.05) is worse than fixed tau=10 (2.36),
+  and tau error (57-63\%) is worse than using the 10-min prior (22\%).
+  Treat as an open problem and a tuning question, not a settled result.
+\item
+  Lag is exactly first-order in the generator, so all results are
+  best-case (no mismatch yet).
+\item
+  \texttt{fc30\_*} forecast metrics are not meaningful; do not report.
+\item
+  Time below 70 mg/dL on the test set is 4.6\% (handoff quotes about
+  6.6\% overall); minor.
+\end{enumerate}
+
+\hypertarget{differences-from-the-project-plan-doc}{%
+\subsection{Differences from the project plan
+doc}\label{differences-from-the-project-plan-doc}}
+
+\begin{itemize}
+\tightlist
+\item
+  Prototype samples at 3 min (Dexcom model in simglucose), plan assumes
+  5 min; run 1, 5 and 15 min sensitivity in Piece 3.
+\item
+  Prototype uses a nonlinear EKF with ln(tau) in the state;
+  plan\textquotesingle s core method is a linear Kalman filter and RTS
+  smoother with a regularised-inversion cross-check. Keep the EKF as a
+  comparison.
+\item
+  Plan\textquotesingle s hypotheses H1 to H4 are not yet tested on
+  mismatched generators (G2, G3).
+\end{itemize}
+
+\hypertarget{proposed-pieces}{%
+\subsection{Proposed pieces}\label{proposed-pieces}}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Verify prototype (this note).
+\item
+  Realistic sensor layer and mismatch generators (fast noise, extra
+  delay, drift, compression lows).
+\item
+  Evaluation harness: baselines, widened tuning, subject-wise splits,
+  bootstrap intervals, analytic ramp test.
+\item
+  Linear Kalman, RTS smoother and regularised inversion; cross-check.
+\item
+  Identifiability study of tau (profile likelihood, population prior,
+  fingerstick-timed regression).
+\item
+  Meal and insulin-aware prior (optional).
+\item
+  OhioT1DM access and exploratory real-data check.
+\item
+  Ablations, final results, report.
+\end{enumerate}
+\end{document}

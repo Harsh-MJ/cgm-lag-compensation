@@ -1,0 +1,249 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,graphicx,hyperref,longtable,booktabs,array}
+\usepackage[margin=2.2cm]{geometry}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setlength{\parindent}{0pt}\setlength{\parskip}{6pt}
+
+\begin{document}
+\hypertarget{physics-informed-lag-compensation-for-continuous-glucose-monitoring}{%
+\section{Physics-informed lag compensation for continuous glucose
+monitoring}\label{physics-informed-lag-compensation-for-continuous-glucose-monitoring}}
+
+DH 803 (Wearable Health Technology) group project, group \textbf{Lag
+Compensators}: Harsh Jadhav (Chemical Engineering) and Shreyas Kamble
+(Mechanical Engineering).
+
+CGM sensors measure glucose in interstitial fluid, which lags blood
+glucose by roughly 5 to 15 minutes. This project models that lag as
+first-order transport and asks two questions in simulation:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  How much of the lag error can a physics-based state estimator (Kalman
+  filter, RTS smoother) remove, in real time and retrospectively,
+  compared with simple baselines?
+\item
+  Can the lag time constant tau be identified from data, per patient or
+  for a population, and can physiological lag be separated from sensor
+  lag?
+\end{enumerate}
+
+Status: simulation study complete through Piece 5 (31 Oct 2026). No
+real-patient data yet; OhioT1DM validation needs a data use agreement.
+
+\begin{quote}
+\textbf{Attribution.} The code, analyses and notes in this repository
+were written by Claude (an AI assistant, Anthropic) at the request of
+Harsh Jadhav, across two chat sessions. The team has not yet
+independently re-run or reviewed them. Before any part is presented as
+the team\textquotesingle s own work, read it, re-run it, and record who
+checked what. Commits are authored as "Claude" for this reason.
+\end{quote}
+
+\hypertarget{main-results-simulation-27-virtual-patients-5-fold-subject-wise-cross-validation}{%
+\subsection{Main results (simulation, 27 virtual patients, 5-fold
+subject-wise
+cross-validation)}\label{main-results-simulation-27-virtual-patients-5-fold-subject-wise-cross-validation}}
+
+Error during rapid glucose change (\textbar rate\textbar{} \textgreater=
+1 mg/dL/min), scenario S0 (model matches), RMSE in mg/dL, median over
+patients:
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+Method & Uses future data? & Noise sd 2 & Noise sd 8 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Raw CGM & no & 19.7 & 21.5 \\
+Naive inversion, tau = 10 & no & 10.2 & 17.9 \\
+Kalman filter, tau = 10 & no & 7.5 & 18.4 \\
+Time shift (tuned) & yes & 8.0 & 11.3 \\
+RTS smoother, tau = 10 & yes & 4.4 & 8.4 \\
+\end{longtable}
+
+Key findings:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Real-time compensation is noise-limited.} The Kalman filter
+  matches the future-peeking shift at low noise but does not beat naive
+  inversion at noise sd 8, and earlier hypoglycaemia alerts come with
+  more false alarms.
+\item
+  \textbf{Retrospective smoothing works best.} The smoother beats the
+  tuned time shift (S0, noise 8: -1.9 mg/dL, 95\% CI -3.3 to -1.3) and
+  cuts false alarms from 0.93 to 0.23 per day.
+\item
+  \textbf{Knowing the true tau barely helps the real-time filter}
+  (difference about 0.1 mg/dL); noise, not tau uncertainty, is the
+  bottleneck.
+\item
+  \textbf{Per-patient tau from the model likelihood is confidently
+  wrong.} 95\% intervals cover the truth in only 4 to 19\% of patients,
+  because the generic glucose model is misspecified for meal-driven
+  glucose.
+\item
+  \textbf{A population lag chosen from fingersticks works.} Using about
+  264 training fingersticks (no ground truth), it picked tau = 16 min
+  when the sensor added 5 min of unmodelled lag, cutting smoother error
+  from 13.5 to 5.8 mg/dL (true-lag oracle 4.5).
+\item
+  \textbf{Physiological and sensor lag cannot be separated} from these
+  data; only their sum (an effective lag) is identifiable.
+\end{itemize}
+
+Figures: \href{results/fig_scenarios.png}{scenarios},
+\href{results/fig_baselines.png}{baselines},
+\href{results/fig_kalman.png}{Kalman estimators},
+\href{results/fig_ident.png}{identifiability}.
+
+\hypertarget{repository-layout}{%
+\subsection{Repository layout}\label{repository-layout}}
+
+\begin{verbatim}
+code/        sensor layer, evaluation harness, Kalman/smoother, identifiability (modules, tests, run and plot scripts)
+data/        sim.npz: 30 simglucose virtual patients x 5 days, 1-min plasma and subcutaneous glucose
+results/     result JSON files, figures, split manifest, likelihood profiles
+prototype/   first prototype (EKF with online tau) from chat 1, with its results and figures
+docs/        project brief, prototype handoff, one note per piece (methods, tests, numbers, caveats), Assignment 2 deck
+run_all.sh   runs every test and experiment in order
+\end{verbatim}
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule\noalign{}
+Piece & What it adds & Code & Note \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+1 & Verification of the prototype & \texttt{prototype/} &
+\href{docs/piece-1-prototype-verification.md}{piece-1} \\
+2 & Realistic sensor layer, scenarios S0 to S5 & \texttt{sensor.py} &
+\href{docs/piece-2-sensor-layer.md}{piece-2} \\
+3 & Evaluation harness, baselines B0 to B3 & \texttt{harness.py} &
+\href{docs/piece-3-evaluation-harness.md}{piece-3} \\
+4 & Kalman filter, RTS smoother, regularised inversion &
+\texttt{kalman.py} &
+\href{docs/piece-4-kalman-estimators.md}{piece-4} \\
+5 & Identifiability of tau, fingerstick tuning & \texttt{ident.py} &
+\href{docs/piece-5-identifiability.md}{piece-5} \\
+\end{longtable}
+
+Scenarios: S0 matched first-order lag; S1 extra 3-min sensor filter and
+2-min delay; S2 two-stage lag; S3 tau drifting about 25\%; S4
+calibration drift and compression lows; S5 all of these together.
+
+\hypertarget{how-to-run}{%
+\subsection{How to run}\label{how-to-run}}
+
+Python 3.10 or newer.
+
+\begin{verbatim}
+pip install -r requirements.txt
+bash run_all.sh            # tests (about 1 min) then all experiments (about 15 min on a laptop)
+\end{verbatim}
+
+Or step by step from \texttt{code/}:
+
+\begin{verbatim}
+cd code
+python3 test_sensor.py ../data/sim.npz
+python3 test_harness.py ../data/sim.npz
+python3 test_kalman.py ../data/sim.npz
+python3 test_ident.py
+python3 run_kalman.py ../data/sim.npz ../results && python3 plot_kalman.py ../results/kalman_results.json ../results/fig_kalman.png
+\end{verbatim}
+
+\texttt{data/sim.npz} can be regenerated with
+\texttt{cd\ prototype\ \&\&\ python3\ run\_gen.py} (needs
+\texttt{simglucose}, about 7 min). That writes to \texttt{data/sim.npz}
+and overwrites the shipped copy.
+
+\hypertarget{caveats}{%
+\subsection{Caveats}\label{caveats}}
+
+\begin{itemize}
+\tightlist
+\item
+  Simulation only. In simglucose the lag is exactly first-order, so
+  matched-scenario results are best-case; scenarios S1 to S5 add
+  deliberate mismatch.
+\item
+  Tuned time-shift and "population tau from truth" results use
+  ground-truth glucose and are simulation-only references.
+\item
+  Sensor noise levels are anchored loosely to one published accuracy
+  study; noise sd 8 mg/dL is the headline stress level.
+\item
+  Hypoglycaemia is over-represented in the simulated patients; three
+  virtual children were excluded as unphysiological.
+\end{itemize}
+
+\hypertarget{next-steps}{%
+\subsection{Next steps}\label{next-steps}}
+
+\begin{itemize}
+\tightlist
+\item
+  Piece 6 (optional): meal- and insulin-driven glucose model as the
+  prior, to fix the likelihood misspecification.
+\item
+  Piece 7: OhioT1DM data use agreement and exploratory real-data check
+  with fingersticks as reference.
+\item
+  Piece 8: ablations (AR(1) noise state, posterior coverage), final
+  report.
+\end{itemize}
+
+\hypertarget{key-references}{%
+\subsection{Key references}\label{key-references}}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  A. Basu et al., "Time lag of glucose from intravascular to
+  interstitial compartment in humans," \emph{Diabetes}, vol. 62, no. 12,
+  pp. 4083-4087, 2013. \url{https://doi.org/10.2337/db13-1132}
+\item
+  G. Schmelzeisen-Redeker et al., "Time delay of CGM sensors: relevance,
+  causes, and countermeasures," \emph{J. Diabetes Sci. Technol.}, vol.
+  9, no. 5, pp. 1006-1015, 2015.
+  \url{https://doi.org/10.1177/1932296815590154}
+\item
+  K. Rebrin, G. M. Steil, W. P. van Antwerp, J. J. Mastrototaro,
+  "Subcutaneous glucose predicts plasma glucose independent of insulin,"
+  \emph{Am. J. Physiol. Endocrinol. Metab.}, vol. 277, no. 3, pp.
+  E561-E571, 1999. \url{https://doi.org/10.1152/ajpendo.1999.277.3.e561}
+\item
+  B. W. Bequette, "Continuous glucose monitoring: real-time algorithms
+  for calibration, filtering, and alarms," \emph{J. Diabetes Sci.
+  Technol.}, vol. 4, no. 2, pp. 404-418, 2010.
+  \url{https://doi.org/10.1177/193229681000400222}
+\item
+  A. Facchinetti et al., "Modeling the glucose sensor error," \emph{IEEE
+  Trans. Biomed. Eng.}, vol. 61, no. 3, pp. 620-629, 2014.
+  \url{https://doi.org/10.1109/TBME.2013.2284023}
+\item
+  C. Dalla Man et al., "The UVA/PADOVA type 1 diabetes simulator: new
+  features," \emph{J. Diabetes Sci. Technol.}, vol. 8, no. 1, pp. 26-34,
+  2014. \url{https://doi.org/10.1177/1932296813514502}
+\item
+  J. Xie, "simglucose v0.2.1," 2018.
+  \url{https://github.com/jxx123/simglucose}
+\item
+  C. Marling and R. Bunescu, "The OhioT1DM dataset for blood glucose
+  level prediction: update 2020," \emph{CEUR Workshop Proc.}, vol. 2675,
+  2020. \url{https://pmc.ncbi.nlm.nih.gov/articles/PMC7881904/}
+\end{enumerate}
+
+This is a research and education project. Nothing here is a medical
+device or a basis for treatment decisions.
+\end{document}

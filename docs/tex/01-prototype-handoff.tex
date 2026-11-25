@@ -1,0 +1,327 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,graphicx,hyperref,longtable,booktabs,array}
+\usepackage[margin=2.2cm]{geometry}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setlength{\parindent}{0pt}\setlength{\parskip}{6pt}
+
+\begin{document}
+\hypertarget{handoff-dh-803-project-physics-informed-lag-compensation-for-cgm}{%
+\section{HANDOFF: DH 803 project, physics-informed lag compensation for
+CGM}\label{handoff-dh-803-project-physics-informed-lag-compensation-for-cgm}}
+
+Written 30 Oct 2026 at the end of chat 1. Everything a new chat needs to
+continue. Read this fully before doing anything.
+
+\hypertarget{0-how-to-use-this}{%
+\subsection{0. How to use this}\label{0-how-to-use-this}}
+
+\begin{itemize}
+\tightlist
+\item
+  New chat should be inside the Claude Project "DH 803" (the code and
+  this brief are stored there under \texttt{claude/}). If it is not,
+  upload \texttt{cgm\_lag\_prototype.zip} and this file.
+\item
+  Project docs: \texttt{claude/cgm-lag-compensation-plan.md} (short
+  brief), \texttt{claude/HANDOFF-cgm-lag-project.md} (this file),
+  \texttt{claude/cgm-lag-code/\{gen.py,\ run\_gen.py,\ est.py,\ evaluate.py,\ plots.py\}}.
+\item
+  Large binaries (\texttt{sim.npz}, figures, results JSON) are only in
+  the zip. \texttt{sim.npz} is reproducible (see section 6).
+\end{itemize}
+
+\hypertarget{1-project-context-as-stated-by-harsh}{%
+\subsection{1. Project context (as stated by
+Harsh)}\label{1-project-context-as-stated-by-harsh}}
+
+\begin{itemize}
+\tightlist
+\item
+  Course: DH 803, wearable health technology. Constraint: project must
+  need no hardware.
+\item
+  Group project, 2 members: Harsh Jadhav (Chemical Engineering, IIT
+  Bombay) and Shreyas Kamble (Mechanical).
+\item
+  Chosen topic: \textbf{Physics-informed lag compensation for CGM}, a
+  transport-based state estimator instead of black-box glucose
+  forecasters. Tools: simglucose (UVA/Padova simulator), OhioT1DM (needs
+  a data use agreement).
+\item
+  Status stated for Assignment 2: literature-review stage. Final
+  deliverables: a document and a PPT.
+\item
+  Attribution rule: keep each member\textquotesingle s contribution
+  accurately attributed; never present a teammate\textquotesingle s work
+  as Harsh\textquotesingle s own, and do not claim work neither of them
+  did. The prototype in section 3 to 5 was produced by Claude in chat 1
+  at Harsh\textquotesingle s request and must be described as such or
+  re-done/verified by the team before being claimed.
+\end{itemize}
+
+\hypertarget{2-idea-and-model}{%
+\subsection{2. Idea and model}\label{2-idea-and-model}}
+
+Interstitial (sensor) glucose \(C_{isf}\) lags plasma glucose \(C_{bg}\)
+by diffusion. First-order transport model:
+
+\[\tau \frac{dC_{isf}}{dt} = C_{bg} - C_{isf} \;\Rightarrow\; C_{bg} \approx C_{isf} + \tau \frac{dC_{isf}}{dt}\]
+
+Worked check: CGM reads 90 mg/dL, slope \(-1.5\) mg/dL/min,
+\(\tau = 10\) min gives \(C_{bg} \approx 90 + 10\times(-1.5) = 75\)
+mg/dL.
+
+Naive inversion amplifies noise (differentiates it), so use a state
+estimator (EKF). Core research problem: \textbf{\(\tau\) is
+patient-specific and, from CGM alone, weakly identifiable.}
+
+\hypertarget{3-simulator-facts-simglucose-0211-pip-install---break-system-packages-simglucose}{%
+\subsection{\texorpdfstring{3. Simulator facts (simglucose 0.2.11,
+\texttt{pip\ install\ -\/-break-system-packages\ simglucose})}{3. Simulator facts (simglucose 0.2.11, pip install -\/-break-system-packages simglucose)}}\label{3-simulator-facts-simglucose-0211-pip-install---break-system-packages-simglucose}}
+
+\begin{itemize}
+\tightlist
+\item
+  30 virtual patients: adolescent\#001-010, adult\#001-010,
+  child\#001-010.
+\item
+  In the patient ODE, \texttt{x{[}3{]}} = plasma glucose mass (mg/kg),
+  plasma glucose = \texttt{x{[}3{]}/Vg}; \texttt{x{[}12{]}} =
+  subcutaneous glucose; \texttt{dx12/dt\ =\ -ksc*x12\ +\ ksc*x3}. So the
+  lag is exactly first-order with true \(\tau = 1/k_{sc}\). Across
+  patients \(\tau\) = 6.6 to 19.9 min (mean 11.9, sd 3.2).
+\item
+  \texttt{patient.observation.Gsub} is the SUBCUTANEOUS glucose, not
+  plasma. simglucose\textquotesingle s own \texttt{BG} output is
+  therefore already lagged. Ground truth plasma must be taken from
+  \texttt{patient.state{[}3{]}/Vg}.
+\item
+  Dexcom sensor: sample time 3 min, noise from \texttt{CGMNoise}
+  (Johnson transform, PACF 0.7). Measured noise sd about 12 mg/dL;
+  \textbf{lag-1 autocorrelation at 3-min sampling is 0.98} (slow,
+  drift-like; probably because the generator works on a coarser grid and
+  interpolates; not verified). This noise dominates the lag error.
+\item
+  Quest.csv gives CR, CF, TDI per patient. Basal = \texttt{u2ss*BW/6000}
+  U/min.
+\end{itemize}
+
+\hypertarget{4-pipeline-as-built-code-in-claudecgm-lag-code}{%
+\subsection{\texorpdfstring{4. Pipeline as built (code in
+\texttt{claude/cgm-lag-code/})}{4. Pipeline as built (code in claude/cgm-lag-code/)}}\label{4-pipeline-as-built-code-in-claudecgm-lag-code}}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{gen.py::run(name,\ days,\ seed)}: 1-min steps. Meals sized
+  from CR and TDI: breakfast/lunch/dinner shares 0.13/0.17/0.20 of TDI
+  as insulin-equivalent (grams = CR\emph{TDI}share\emph{U(0.8,1.2)) at
+  about 07:30/12:30/19:00 (time jitter), snack on 50\% of days
+  (0.04}CR\emph{TDI}U(0.5,1.5)), bolus = grams/CR * clip(N(0.92, 0.18),
+  0.5, 1.4). Returns plasma, cgm, sub, cho, ins, tau.
+\item
+  \texttt{run\_gen.py}: 30 patients x 5 days, seed \texttt{100+i},
+  multiprocessing, writes \texttt{../data/sim.npz} (keys
+  \texttt{name\textbar{}field}). About 6.5 min on 2 cores.
+\item
+  \texttt{est.py}: \texttt{local\_fit} (causal local linear regression),
+  \texttt{inversion}, \texttt{ekf}.
+
+  \begin{itemize}
+  \tightlist
+  \item
+    EKF state \([G, \dot G, I, \ln\tau, e]\); \(G\) random-walk-rate
+    model (\(\dot G\) random walk with variance \texttt{qr} per min),
+    \(I\) follows \(\dot I = (G-I)/\tau\) (3 Euler sub-steps of 1 min
+    per 3-min sample), measurement \(y = I + e\), \(e\) is AR(1) sensor
+    noise (sd from tuning data, \(\phi\) from data), small extra R=1.
+    Optional fingerstick update on \(G\): simulated 4/day (about 07:00,
+    11:30, 17:30, 22:00, jitter sd 15 min) with 4\% CV noise; the filter
+    assumes 5\% CV plus 2 mg/dL.
+  \item
+    \texttt{free\_tau=True}: \(\ln\tau\) random walk (q\_theta =
+    0.005\^{}2 per min, prior sd 0.4, prior mean ln 10, clipped to 2..40
+    min).
+  \end{itemize}
+\item
+  \texttt{evaluate.py} (env \texttt{NS} = sensor-noise scale:
+  \texttt{y\ =\ Gs\ +\ NS*(cgm\ -\ Gs)}): see section 5 for protocol.
+  Outputs \texttt{../data/results{[}\_nsX{]}.json},
+  \texttt{preds{[}\_nsX{]}.pkl}, \texttt{tuned{[}\_nsX{]}.pkl}. About 3
+  min per noise level.
+\item
+  \texttt{plots.py}: fig1 (RMSE vs noise), fig2 (example trace), fig3
+  (tau recovery). Run order: \texttt{python3\ run\_gen.py} then
+  \texttt{python3\ evaluate.py} (NS=1),
+  \texttt{NS=0\ python3\ evaluate.py},
+  \texttt{NS=0.3\ python3\ evaluate.py}, \texttt{python3\ plots.py}.
+  Scripts must run from the scripts directory (relative
+  \texttt{../data}, \texttt{../figs}). Create \texttt{../data} and
+  \texttt{../figs} first.
+\end{enumerate}
+
+\hypertarget{5-evaluation-protocol-and-results}{%
+\subsection{5. Evaluation protocol and
+results}\label{5-evaluation-protocol-and-results}}
+
+\begin{itemize}
+\tightlist
+\item
+  Patients excluded as unphysiological (min plasma \textless30 mg/dL or
+  \textgreater15\% of time \textless54): child\#002, child\#004,
+  child\#008 -\textgreater{} 27 used. Alternating split in sorted order:
+  14 tune / 13 test. Test = adolescent\#002,004,006,008,010;
+  adult\#002,004,006,008,010; child\#003,006,009.
+\item
+  6 h warm-up (120 samples) dropped. Tuning criterion: RMSE vs true
+  plasma on tune patients (uses ground truth; in real data tune against
+  fingersticks).
+\item
+  Hypoglycemia event: plasma \textless70 mg/dL, events merged if gaps
+  \textless30 min. Detected if estimate \textless70 within {[}event
+  start - 30 min, event end{]}; delay = first alarm minus true start
+  (negative = early). False alarm: alarm onset with no true \textless70
+  within +/-30 min.
+\item
+  Tuned hyperparameters: NS=1: inversion W=3; ekf\_fix qr=0.01;
+  ekf\_fix\_fs 0.003; ekf\_est 0.3; ekf\_est\_fs 0.3; oracle 0.001.
+  NS=0: inversion W=3; all EKF variants qr=0.3. \textbf{Several sit at
+  the edge of the grid (1e-3..3e-1); widen the grid.}
+\end{itemize}
+
+RMSE vs true plasma (mg/dL), 13 held-out patients:
+
+\begin{longtable}[]{@{}llllll@{}}
+\toprule\noalign{}
+Noise scale & Raw CGM & Fixed-tau inversion & EKF tau=10 & EKF online
+tau + fingersticks & EKF true tau (oracle) \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+0 & 8.71 & 2.66 & 2.36 & 5.05 & 0.93 \\
+0.3 & 9.46 & 5.30 & 5.26 & 7.48 & 5.14 \\
+1 & 15.08 & 15.50 & 15.56 & 14.48 & 15.56 \\
+\end{longtable}
+
+Hypoglycemia detection (26 events in test set), mean delay in min /
+false alarms per day:
+
+\begin{itemize}
+\tightlist
+\item
+  NS=0: raw 12.4 / 0.00; inversion 1.0 / 0.00; EKF tau=10 1.2 / 0.00;
+  EKF online tau + fingersticks 7.3 / 0.00; oracle -0.3 / 0.00.
+\item
+  NS=1: raw 4.7 / 0.36; inversion -7.5 / 1.33; EKF tau=10 -6.3 / 0.87;
+  EKF online tau 1.8 / 0.44; EKF online + fingersticks -0.7 / 0.63;
+  oracle -5.1 / 0.66.
+\end{itemize}
+
+Tau recovery (median absolute \% error of mean \(\hat\tau\) over last
+day): NS=0: 63\% (no fingersticks), 57\% (with); NS=1: 82\% both. Simply
+using the 10-min prior: 22\%. Correlation \(\hat\tau\) vs true \(\tau\)
+about 0.1 to 0.2.
+
+Independent sanity checks done: recomputed raw RMSE (8.71) and oracle
+RMSE (0.93) at NS=0 directly from saved arrays.
+
+\hypertarget{6-findings}{%
+\subsection{6. Findings}\label{6-findings}}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  With roughly correct \(\tau\), lag compensation removes most lag error
+  (RMSE -73\%, hypo detection delay about 12 min to about 1 min at
+  NS=0).
+\item
+  At full simulator noise nothing beats raw CGM clearly on RMSE; earlier
+  alerts cost more false alarms.
+\item
+  Online \(\tau\) estimation fails (no better than the prior). This is
+  the open research problem.
+\end{enumerate}
+
+\hypertarget{7-caveats-and-known-issues}{%
+\subsection{7. Caveats and known
+issues}\label{7-caveats-and-known-issues}}
+
+\begin{itemize}
+\tightlist
+\item
+  Simulation only; lag is exactly first-order in the model, so results
+  are optimistic. No real-data validation.
+\item
+  Version history: first data run overdosed children (meals not scaled)
+  and had a MARD bug caused by plasma near 0; fixed by CR/TDI-scaled
+  meals, patient exclusion and a MARD mask (plasma \textgreater= 40).
+\item
+  Hypoglycemia is over-represented (about 6.6\% of simulated time
+  \textless70 mg/dL).
+\item
+  Naive 30-min forecast (\texttt{rate*30}) lost to persistence;
+  \texttt{fc30\_*} metrics in the JSONs are not meaningful. Do not
+  report them.
+\item
+  Process-noise grid edge hit; online-\(\tau\) failure may be partly
+  tuning.
+\item
+  No literature has been checked yet; every claim about published sensor
+  lag or published Kalman-filter CGM work still needs a source.
+\end{itemize}
+
+\hypertarget{8-next-steps-proposed}{%
+\subsection{8. Next steps (proposed)}\label{8-next-steps-proposed}}
+
+\begin{itemize}
+\tightlist
+\item
+  Phase 1: harden the simulation with model mismatch (extra unmodelled
+  sensor delay, calibration drift, compression lows, realistic noise
+  with a fast component); widen and re-tune qr properly.
+\item
+  Phase 2 (the contribution): make \(\tau\) identifiable. Options:
+  meal/insulin inputs through a minimal glucose-insulin model as the
+  glucose prior; hierarchical/population prior over \(\tau\) (e.g.,
+  log-normal) with per-patient shrinkage; fingerstick-timed regression
+  of \((G - I)\) on \(\dot I\); compare against an LSTM baseline.
+\item
+  Phase 3: OhioT1DM validation (request data use agreement now),
+  fingersticks as reference.
+\item
+  Assignment 2 (literature review): topics to search and verify:
+  blood-to-interstitial glucose kinetics and time-lag; Kalman-filter
+  based CGM calibration/denoising and lag correction (e.g., Knobbe and
+  Buckingham; Facchinetti et al.); UVA/Padova model (Dalla Man,
+  Kovatchev); OhioT1DM dataset papers (Marling and Bunescu); CGM
+  accuracy metrics and Clarke/Parkes error grids. These names are from
+  memory and unverified: confirm each before citing.
+\end{itemize}
+
+\hypertarget{9-working-preferences-for-the-next-chat}{%
+\subsection{9. Working preferences for the next
+chat}\label{9-working-preferences-for-the-next-chat}}
+
+Concise, structured: bold key terms, bullets, tables; inline math with
+single \texttt{\$...\$}, display equations with \texttt{\$\$...\$\$}
+(valid LaTeX only); stepwise calculations for worked examples; cite a
+source for every number or fact in any market/literature material; no
+interactive widgets unless asked.
+
+\hypertarget{10-starter-prompt-to-paste-in-the-new-chat}{%
+\subsection{10. Starter prompt to paste in the new
+chat}\label{10-starter-prompt-to-paste-in-the-new-chat}}
+
+"Continue the DH 803 project \textquotesingle Physics-informed lag
+compensation for CGM\textquotesingle. Read
+\texttt{claude/HANDOFF-cgm-lag-project.md} and the code in
+\texttt{claude/cgm-lag-code/} in this Project first. Then {[}state the
+task: e.g., build phase 2 (identifiable tau with meal/insulin-aware
+estimator) / write the Assignment 2 literature review / prepare the
+document and PPT{]}."
+\end{document}
