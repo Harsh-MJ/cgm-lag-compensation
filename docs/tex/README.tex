@@ -32,8 +32,11 @@ first-order transport and asks two questions in simulation:
   lag?
 \end{enumerate}
 
-Status: simulation study complete through Piece 5 (31 Oct 2026). No
-real-patient data yet; OhioT1DM validation needs a data use agreement.
+Status: simulation study complete through Piece 8 (26 Nov 2026), final
+report in \texttt{docs/tex/final-report.tex}. No real-patient data yet:
+the OhioT1DM check is implemented and tested on synthetic files but not
+run, because the dataset needs a data use agreement (see
+\texttt{docs/piece-7-real-data.md}).
 
 \hypertarget{main-results-simulation-27-virtual-patients-5-fold-subject-wise-cross-validation}{%
 \subsection{Main results (simulation, 27 virtual patients, 5-fold
@@ -88,12 +91,23 @@ Key findings:
 \item
   \textbf{Physiological and sensor lag cannot be separated} from these
   data; only their sum (an effective lag) is identifiable.
+\item
+  \textbf{A meal/insulin-driven prior (Piece 6) helps the state estimate
+  but does not fix lag identifiability.} It improves the smoother in all
+  four tested conditions and the real-time filter by about 5 mg/dL at
+  noise sd 8, but per-patient lag intervals still cover the truth in
+  only 19 to 37\% of patients.
+\item
+  \textbf{An AR(1) sensor-noise state (Piece 8) fixes the uncertainty,
+  not the accuracy.} Smoother 95\% intervals cover about 0.9 of the time
+  with it and 0.5 to 0.7 without, while RMSE does not improve.
 \end{itemize}
 
 Figures: \href{results/fig_scenarios.png}{scenarios},
 \href{results/fig_baselines.png}{baselines},
 \href{results/fig_kalman.png}{Kalman estimators},
-\href{results/fig_ident.png}{identifiability}.
+\href{results/fig_ident.png}{identifiability},
+\href{results/fig_pieces678.png}{Pieces 6 to 8}.
 
 \hypertarget{repository-layout}{%
 \subsection{Repository layout}\label{repository-layout}}
@@ -103,7 +117,7 @@ code/        sensor layer, evaluation harness, Kalman/smoother, identifiability 
 data/        sim.npz: 30 simglucose virtual patients x 5 days, 1-min plasma and subcutaneous glucose
 results/     result JSON files, figures, split manifest, likelihood profiles
 prototype/   first prototype (EKF with online tau) from chat 1, with its results and figures
-docs/        project brief, prototype handoff, one note per piece (methods, tests, numbers, caveats), Assignment 2 deck
+docs/        project brief, prototype handoff, one note per piece (methods, tests, numbers, caveats), LaTeX versions in docs/tex/, OhioT1DM request draft
 run_all.sh   runs every test and experiment in order
 \end{verbatim}
 
@@ -125,6 +139,14 @@ Piece & What it adds & Code & Note \\
 \href{docs/piece-4-kalman-estimators.md}{piece-4} \\
 5 & Identifiability of tau, fingerstick tuning & \texttt{ident.py} &
 \href{docs/piece-5-identifiability.md}{piece-5} \\
+6 & Meal- and insulin-driven prior & \texttt{inputs.py} &
+\href{docs/piece-6-input-prior.md}{piece-6} \\
+7 & OhioT1DM loader and fingerstick check (not yet run on real data) &
+\texttt{real.py} & \href{docs/piece-7-real-data.md}{piece-7} \\
+8 & Ablations, posterior coverage, final report &
+\texttt{run\_ablate.py}, \texttt{run\_coverage.py} &
+\href{docs/piece-8-ablations.md}{piece-8},
+\href{docs/tex/final-report.tex}{final report} \\
 \end{longtable}
 
 Scenarios: S0 matched first-order lag; S1 extra 3-min sensor filter and
@@ -183,14 +205,14 @@ and overwrites the shipped copy.
 \begin{itemize}
 \tightlist
 \item
-  Piece 6 (optional): meal- and insulin-driven glucose model as the
-  prior, to fix the likelihood misspecification.
+  Get the OhioT1DM files (draft request in
+  \texttt{docs/ohiot1dm-request.md}) and run \texttt{code/run\_real.py}.
 \item
-  Piece 7: OhioT1DM data use agreement and exploratory real-data check
-  with fingersticks as reference.
+  Make the meal/insulin logs noisy and incomplete in simulation, to see
+  how much of the Piece 6 gain survives.
 \item
-  Piece 8: ablations (AR(1) noise state, posterior coverage), final
-  report.
+  Estimate the population effective lag from fingersticks on real data
+  and compare with the simulated value.
 \end{itemize}
 
 \hypertarget{key-references}{%

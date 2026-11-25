@@ -1,0 +1,51 @@
+# Piece 6: meal- and insulin-driven prior (26 Nov 2026)
+
+Code: `code/inputs.py`, `code/test_inputs.py` (9 of 9 pass), `code/run_inputs.py`; results `results/inputs_results.json`, `results/inputs_profiles.npz`. Written by Claude (AI assistant); the team must read and sign off before claiming it.
+
+## Model
+Blood glucose is driven by the logged meals and insulin instead of a pure random-walk rate:
+
+$$\frac{dG_I}{dt}=\frac{G_B-G_I}{\tau},\qquad \frac{dG_B}{dt}=R+a\,u_1(t)-b\,u_2(t),\qquad \frac{dR}{dt}=\sqrt{q}\,\xi(t),\qquad y_k=G_I(t_k)+e_k$$
+
+$u_1$ is carbohydrate (g/min) through a two-compartment gut kernel (time constant 20 min); $u_2$ is insulin above basal (U/min) through a three-compartment subcutaneous kernel (time constant 40 min). The patient gains $a$ (mg/dL per g) and $b$ (mg/dL per U) are extra Kalman states with weak priors (5 and 40) and a slow random walk. Kernel shapes are fixed population constants (my pick, not tuned). The 5-state filter and smoother use an exact piecewise-constant discretisation of the input term.
+
+## Tests (9 of 9 pass)
+Zero inputs reproduce the Piece 4 filter (max difference 7e-14) and smoother (7.5e-13); kernels normalised with peaks at 20 and 80 min; basal insulin gives no drive and meal mass is conserved; on data generated from the model the likelihood recovers tau (median 10.6 for truth 10) and the gains (a 6.1 vs 6, b 48.3 vs 40); inputs cut smoother RMSE (0.66 vs 3.25 mg/dL); smoother 95% intervals cover 0.977 of the truth; an AR(1) noise state raises the likelihood on AR(1)-noise data.
+
+## Results (27 simulated patients, days 1 to 3 for the lag, days 4 to 5 for evaluation)
+Per-patient lag from the likelihood, truth = true effective lag:
+
+| Condition | Prior | median abs. error | median signed error (min) | 95% interval covers truth | estimates at the 4-min floor |
+| --- | --- | --- | --- | --- | --- |
+| S0, noise 2 | random walk | 50% | -1.9 | 0.19 | 0.15 |
+| | meal/insulin | 50% | +4.0 | 0.22 | 0.04 |
+| | placebo (inputs shifted) | 50% | -2.5 | 0.19 | 0.22 |
+| S0, noise 8 | random walk | 62% | -6.4 | 0.19 | 0.78 |
+| | meal/insulin | 51% | -2.7 | 0.37 | 0.26 |
+| | placebo | 63% | -6.7 | 0.22 | 0.81 |
+| S1, noise 2 | random walk | 52% | -6.9 | 0.07 | 0.15 |
+| | meal/insulin | 38% | -1.0 | 0.33 | 0.04 |
+| | placebo | 49% | -7.9 | 0.11 | 0.19 |
+| S1, noise 8 | random walk | 74% | -11.4 | 0.11 | 0.78 |
+| | meal/insulin | 66% | -7.2 | 0.19 | 0.33 |
+| | placebo | 75% | -11.7 | 0.07 | 0.81 |
+
+Rapid-change RMSE (mg/dL, median over patients, days 4 to 5; paired difference with 95% CI for inputs minus random walk, tau = 10):
+
+| Condition | real-time filter, random walk | real-time filter, inputs | difference | smoother, random walk | smoother, inputs | difference |
+| --- | --- | --- | --- | --- | --- | --- |
+| S0, noise 2 | 7.8 | 8.4 | +0.5 [-1.3, +1.4] | 4.9 | 4.6 | -0.3 [-0.3, -0.1] |
+| S0, noise 8 | 20.3 | 14.9 | -5.0 [-8.5, -3.7] | 8.3 | 8.4 | -1.0 [-1.6, -0.2] |
+| S1, noise 2 | 15.9 | 18.9 | +1.1 [+0.3, +4.7] | 13.5 | 11.9 | -1.2 [-1.3, -1.0] |
+| S1, noise 8 | 25.8 | 21.2 | -5.0 [-8.6, -4.1] | 13.7 | 12.1 | -1.6 [-2.8, -1.0] |
+
+(Medians of differences need not equal differences of medians.) Real-time hypoglycaemia detection is unchanged (23 of 23 events); false alarms per day fall from 0.59, 1.04, 0.56, 1.17 to 0.26, 0.69, 0.22, 0.81 in the four conditions.
+
+## What this means
+1. The input prior is real information: moving the inputs by 400 samples (placebo) removes the gain, and with inputs the likelihood bias falls and the pile-up at the 4-min grid floor drops from 0.78 to 0.26 to 0.33 at noise 8.
+2. It does not fix the misspecification. Per-patient likelihood estimates still miss the true lag by 38 to 66% (median), coverage of the 95% interval stays at 0.19 to 0.37, and correlation with the truth is near zero. Using the per-patient estimate in the smoother is worse than tau = 10 in S0 (+5.7 [+0.3, +8.6] mg/dL at noise 2, +2.7 [+0.2, +4.2] at noise 8). Per-patient lag stays unidentifiable.
+3. What it does buy is a better state estimate at a fixed tau: the smoother improves in all four conditions, and the real-time filter improves by about 5 mg/dL at noise sd 8 (the noise-limited regime of Piece 4), but not at noise 2.
+4. Told the true effective lag, the input smoother reaches 2.3, 7.3, 3.6 and 7.2 mg/dL: the headroom from knowing tau is still large, so the open problem is estimating tau, not the state prior.
+
+## Caveats
+Inputs are the simulator's exact logged carbohydrate and insulin; real logs are noisy and incomplete (missed boluses, estimated carbs), so these gains are an upper bound. Kernel constants were chosen once, not tuned on these results; Piece 8 checks sensitivity to them.

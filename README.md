@@ -7,7 +7,7 @@ CGM sensors measure glucose in interstitial fluid, which lags blood glucose by r
 1. How much of the lag error can a physics-based state estimator (Kalman filter, RTS smoother) remove, in real time and retrospectively, compared with simple baselines?
 2. Can the lag time constant tau be identified from data, per patient or for a population, and can physiological lag be separated from sensor lag?
 
-Status: simulation study complete through Piece 5 (31 Oct 2026). No real-patient data yet; OhioT1DM validation needs a data use agreement.
+Status: simulation study complete through Piece 8 (26 Nov 2026), final report in `docs/tex/final-report.tex`. No real-patient data yet: the OhioT1DM check is implemented and tested on synthetic files but not run, because the dataset needs a data use agreement (see `docs/piece-7-real-data.md`).
 
 
 
@@ -30,8 +30,10 @@ Key findings:
 - **Per-patient tau from the model likelihood is confidently wrong.** 95% intervals cover the truth in only 4 to 19% of patients, because the generic glucose model is misspecified for meal-driven glucose.
 - **A population lag chosen from fingersticks works.** Using about 264 training fingersticks (no ground truth), it picked tau = 16 min when the sensor added 5 min of unmodelled lag, cutting smoother error from 13.5 to 5.8 mg/dL (true-lag oracle 4.5).
 - **Physiological and sensor lag cannot be separated** from these data; only their sum (an effective lag) is identifiable.
+- **A meal/insulin-driven prior (Piece 6) helps the state estimate but does not fix lag identifiability.** It improves the smoother in all four tested conditions and the real-time filter by about 5 mg/dL at noise sd 8, but per-patient lag intervals still cover the truth in only 19 to 37% of patients.
+- **An AR(1) sensor-noise state (Piece 8) fixes the uncertainty, not the accuracy.** Smoother 95% intervals cover about 0.9 of the time with it and 0.5 to 0.7 without, while RMSE does not improve.
 
-Figures: [scenarios](results/fig_scenarios.png), [baselines](results/fig_baselines.png), [Kalman estimators](results/fig_kalman.png), [identifiability](results/fig_ident.png).
+Figures: [scenarios](results/fig_scenarios.png), [baselines](results/fig_baselines.png), [Kalman estimators](results/fig_kalman.png), [identifiability](results/fig_ident.png), [Pieces 6 to 8](results/fig_pieces678.png).
 
 ## Repository layout
 
@@ -40,7 +42,7 @@ code/        sensor layer, evaluation harness, Kalman/smoother, identifiability 
 data/        sim.npz: 30 simglucose virtual patients x 5 days, 1-min plasma and subcutaneous glucose
 results/     result JSON files, figures, split manifest, likelihood profiles
 prototype/   first prototype (EKF with online tau) from chat 1, with its results and figures
-docs/        project brief, prototype handoff, one note per piece (methods, tests, numbers, caveats), Assignment 2 deck
+docs/        project brief, prototype handoff, one note per piece (methods, tests, numbers, caveats), LaTeX versions in docs/tex/, OhioT1DM request draft
 run_all.sh   runs every test and experiment in order
 ```
 
@@ -51,6 +53,9 @@ run_all.sh   runs every test and experiment in order
 | 3 | Evaluation harness, baselines B0 to B3 | `harness.py` | [piece-3](docs/piece-3-evaluation-harness.md) |
 | 4 | Kalman filter, RTS smoother, regularised inversion | `kalman.py` | [piece-4](docs/piece-4-kalman-estimators.md) |
 | 5 | Identifiability of tau, fingerstick tuning | `ident.py` | [piece-5](docs/piece-5-identifiability.md) |
+| 6 | Meal- and insulin-driven prior | `inputs.py` | [piece-6](docs/piece-6-input-prior.md) |
+| 7 | OhioT1DM loader and fingerstick check (not yet run on real data) | `real.py` | [piece-7](docs/piece-7-real-data.md) |
+| 8 | Ablations, posterior coverage, final report | `run_ablate.py`, `run_coverage.py` | [piece-8](docs/piece-8-ablations.md), [final report](docs/tex/final-report.tex) |
 
 Scenarios: S0 matched first-order lag; S1 extra 3-min sensor filter and 2-min delay; S2 two-stage lag; S3 tau drifting about 25%; S4 calibration drift and compression lows; S5 all of these together.
 
@@ -85,9 +90,9 @@ python3 run_kalman.py ../data/sim.npz ../results && python3 plot_kalman.py ../re
 
 ## Next steps
 
-- Piece 6 (optional): meal- and insulin-driven glucose model as the prior, to fix the likelihood misspecification.
-- Piece 7: OhioT1DM data use agreement and exploratory real-data check with fingersticks as reference.
-- Piece 8: ablations (AR(1) noise state, posterior coverage), final report.
+- Get the OhioT1DM files (draft request in `docs/ohiot1dm-request.md`) and run `code/run_real.py`.
+- Make the meal/insulin logs noisy and incomplete in simulation, to see how much of the Piece 6 gain survives.
+- Estimate the population effective lag from fingersticks on real data and compare with the simulated value.
 
 ## Key references
 

@@ -1,0 +1,70 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,graphicx,hyperref,longtable,booktabs,array}
+\usepackage[margin=2.2cm]{geometry}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setlength{\parindent}{0pt}\setlength{\parskip}{6pt}
+
+\begin{document}
+\hypertarget{piece-7-ohiot1dm-and-the-real-data-check-26-nov-2026}{%
+\section{Piece 7: OhioT1DM and the real-data check (26 Nov
+2026)}\label{piece-7-ohiot1dm-and-the-real-data-check-26-nov-2026}}
+
+Code: \texttt{code/real.py} (loader and leave-one-patient-out
+fingerstick check), \texttt{code/make\_fake\_ohio.py},
+\texttt{code/test\_real.py} (4 of 4 pass), \texttt{code/run\_real.py};
+request draft \texttt{docs/ohiot1dm-request.md}. Written by Claude (AI
+assistant); the team must read and sign off before claiming it.
+
+\hypertarget{status-not-run-on-real-data}{%
+\subsection{Status: not run on real
+data}\label{status-not-run-on-real-data}}
+
+OhioT1DM needs a signed data-use agreement. No copy was downloaded: the
+dataset hosts (Kaggle, PhysioNet, Ohio and Charlotte pages) are blocked
+from this workspace, and copies posted on third-party sites would breach
+the agreement. What exists is the whole pipeline, tested on synthetic
+files in OhioT1DM XML format, so it runs as soon as the files are
+available:
+
+\texttt{python3\ -I\ code/run\_real.py\ \textless{}folder\ with\ the\ OhioT1DM\ .xml\ files\textgreater{}\ results}
+
+\hypertarget{access-checked-26-nov-2026}{%
+\subsection{Access (checked 26 Nov
+2026)}\label{access-checked-26-nov-2026}}
+
+Dataset pages say to email Razvan Bunescu
+(\href{mailto:razvan.bunescu@charlotte.edu}{\nolinkurl{razvan.bunescu@charlotte.edu}}),
+subject \texttt{OhioT1DM\ Request}, with name, job title and
+institutional email; the link and password arrive by email within about
+a week. One page instead says to complete the DUA form and email it to
+the Ohio University technology coordinator. The draft in
+\texttt{docs/ohiot1dm-request.md} handles both and has blanks for the
+instructor and the IITB email. A DUA is normally signed by faculty, so
+ask the DH 803 instructor to sign.
+
+\hypertarget{what-the-check-does}{%
+\subsection{What the check does}\label{what-the-check-does}}
+
+Parser: CGM (5 min), fingersticks, meals, boluses, basal and temp basal
+to a 5-min grid and the Piece 6 input drives. For each left-out patient,
+tau, process noise and sensor noise are chosen to minimise fingerstick
+error on the other patients; the held-out patient is scored on its own
+fingersticks: raw CGM, smoother with tau = 10, tuned smoother, with and
+without the input prior. Tests (synthetic): loader reads CGM,
+fingersticks, meals and boluses; the grid has 5-min samples and about
+5\% gaps; the drives are non-negative; the leave-one-patient-out run
+completes and the smoother beats raw CGM against the synthetic
+fingersticks (8.1 vs 7.9 mg/dL, a plumbing check only).
+
+\hypertarget{cautions-for-the-real-run}{%
+\subsection{Cautions for the real run}\label{cautions-for-the-real-run}}
+
+Fingersticks are noisy (about 5 to 10\%), sparse, usually taken before
+meals, and on some sensors were used to calibrate the CGM, so agreement
+with them is not the same as accuracy against blood glucose. Report this
+as exploratory. Per-patient lag will be as unidentifiable on real data
+as in simulation; the useful output is the population lag chosen on
+other patients.
+\end{document}
