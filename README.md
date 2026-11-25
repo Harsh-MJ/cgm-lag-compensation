@@ -9,7 +9,7 @@ CGM sensors measure glucose in interstitial fluid, which lags blood glucose by r
 
 Status: simulation study complete through Piece 5 (31 Oct 2026). No real-patient data yet; OhioT1DM validation needs a data use agreement.
 
-> **Attribution.** The code, analyses and notes in this repository were written by Claude (an AI assistant, Anthropic) at the request of Harsh Jadhav, across two chat sessions. The team has not yet independently re-run or reviewed them. Before any part is presented as the team's own work, read it, re-run it, and record who checked what. Commits are authored as "Claude" for this reason.
+
 
 ## Main results (simulation, 27 virtual patients, 5-fold subject-wise cross-validation)
 
